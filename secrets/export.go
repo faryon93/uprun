@@ -1,4 +1,4 @@
-package main
+package secrets
 
 // uprun
 // Copyright (C) 2018 Maximilian Pachl
@@ -20,15 +20,39 @@ package main
 //  imports
 // ---------------------------------------------------------------------------------------
 
-import ()
+import (
+	"github.com/sirupsen/logrus"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+)
 
 // ---------------------------------------------------------------------------------------
-//  types
+//  public functions
 // ---------------------------------------------------------------------------------------
 
-type Conf struct {
-	SecretDir    string `hcl:"secret_dir"`
-	SecretPrefix string `hcl:"secret_prefix"`
+// Export reads all secrets in a directory.
+func Export(path string) (Environment, error) {
+	env := make([]string, 0)
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
 
-	Services []*Service `hcl:"service"`
+		buf, err := ioutil.ReadFile(path)
+		if err != nil {
+			logrus.Errorln("failed to read secret:", err.Error())
+			return nil
+		}
+
+		env = append(env, strings.ToUpper(info.Name())+"="+string(buf))
+
+		return nil
+	})
+	if err != nil {
+		return make([]string, 0), err
+	}
+
+	return env, nil
 }

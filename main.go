@@ -21,6 +21,7 @@ package main
 // ---------------------------------------------------------------------------------------
 
 import (
+	"github.com/faryon93/uprun/secrets"
 	"github.com/hashicorp/hcl"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
@@ -35,6 +36,10 @@ import (
 // ---------------------------------------------------------------------------------------
 
 func main() {
+	formater := logrus.TextFormatter{ForceColors: true}
+	logrus.SetFormatter(&formater)
+	logrus.SetOutput(os.Stdout)
+
 	buf, err := ioutil.ReadFile("uprun.example.hcl")
 	if err != nil {
 		panic(err)
@@ -44,6 +49,9 @@ func main() {
 	err = hcl.Decode(&conf, string(buf))
 	if err != nil {
 		panic(err)
+	}
+	if conf.SecretDir == "" {
+		conf.SecretDir = "/run/secrets"
 	}
 
 	failure := make(chan *Service)
@@ -89,10 +97,21 @@ func main() {
 		}
 	}()
 
+	secret, err := secrets.Export(conf.SecretDir)
+	if err != nil {
+		logrus.Errorln("failed to export secrets:", err.Error())
+	}
+
 	wg := sync.WaitGroup{}
 	for _, service := range conf.Services {
 		logrus.Infoln("starting service", service.Name)
-		err := service.Spawn(&wg, failure)
+
+		secretPrefix := service.SecretPrefix
+		if secretPrefix == "" {
+			secretPrefix = conf.SecretPrefix
+		}
+
+		err := service.Spawn(&wg, failure, secret.WithPrefix(service.SecretPrefix))
 		if err != nil {
 			logrus.Errorln("failed to spawn server", service.Name, err.Error())
 			continue

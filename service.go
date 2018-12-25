@@ -40,6 +40,7 @@ type Service struct {
 	CaptureStdErr bool   `hcl:"capture_stderr"`
 	IgnoreFailure bool   `hcl:"ignore_failure"`
 	StopTimeout   string `hcl:"stop_timeout"`
+	SecretPrefix  string `hcl:"secret_prefix"`
 
 	cmd *exec.Cmd
 }
@@ -48,13 +49,14 @@ type Service struct {
 //  public members
 // ---------------------------------------------------------------------------------------
 
-func (s *Service) Spawn(wg *sync.WaitGroup, failure chan *Service) error {
+func (s *Service) Spawn(wg *sync.WaitGroup, failure chan *Service, env []string) error {
 	cmd, err := shellquote.Split(s.Command)
 	if err != nil {
 		return err
 	}
 
 	s.cmd = newCmd(cmd)
+	s.cmd.Env = append(env, os.Environ()...)
 
 	if s.CaptureStdOut {
 		s.cmd.Stdout = os.Stdout

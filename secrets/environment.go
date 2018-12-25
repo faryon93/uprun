@@ -1,4 +1,4 @@
-package main
+package secrets
 
 // uprun
 // Copyright (C) 2018 Maximilian Pachl
@@ -20,15 +20,32 @@ package main
 //  imports
 // ---------------------------------------------------------------------------------------
 
-import ()
+import (
+	"strings"
+)
 
 // ---------------------------------------------------------------------------------------
 //  types
 // ---------------------------------------------------------------------------------------
 
-type Conf struct {
-	SecretDir    string `hcl:"secret_dir"`
-	SecretPrefix string `hcl:"secret_prefix"`
+type Environment []string
 
-	Services []*Service `hcl:"service"`
+// ---------------------------------------------------------------------------------------
+//  public members
+// ---------------------------------------------------------------------------------------
+
+func (e Environment) WithPrefix(prefix string) Environment {
+	prefix = strings.ToUpper(prefix)
+	env := make(Environment, 0)
+	if prefix == "-" {
+		return env
+	}
+
+	for _, key := range e {
+		if strings.HasPrefix(key, prefix) {
+			env = append(env, key)
+		}
+	}
+
+	return env
 }
