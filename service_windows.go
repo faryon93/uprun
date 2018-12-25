@@ -20,12 +20,16 @@ package main
 //  imports
 // ---------------------------------------------------------------------------------------
 
-import ()
+import (
+	"os/exec"
+)
 
 // ---------------------------------------------------------------------------------------
-//  types
+//  private members
 // ---------------------------------------------------------------------------------------
 
-type Conf struct {
-	Services []*Service `hcl:"service"`
+func newCmd(cmd []string) *exec.Cmd {
+	execCmd := exec.Command(cmd[0], cmd[1:]...)
+
+	return execCmd
 }

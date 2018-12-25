@@ -20,12 +20,18 @@ package main
 //  imports
 // ---------------------------------------------------------------------------------------
 
-import ()
+import (
+	"os/exec"
+	"syscall"
+)
 
 // ---------------------------------------------------------------------------------------
-//  types
+//  private members
 // ---------------------------------------------------------------------------------------
 
-type Conf struct {
-	Services []*Service `hcl:"service"`
+func newCmd(cmd []string) *exec.Cmd {
+	execCmd := exec.Command(cmd[0], cmd[1:]...)
+	execCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	return execCmd
 }
