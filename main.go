@@ -39,6 +39,8 @@ import (
 var (
 	ForceColors bool
 	ConfigPath  string
+
+	Config *Conf
 )
 
 // ---------------------------------------------------------------------------------------
@@ -46,6 +48,8 @@ var (
 // ---------------------------------------------------------------------------------------
 
 func main() {
+	var err error
+
 	flag.BoolVar(&ForceColors, "colors", false, "force logging with colors")
 	flag.StringVar(&ConfigPath, "conf", "uprun.chl", "path to config file")
 	flag.Parse()
@@ -56,7 +60,7 @@ func main() {
 	logrus.SetOutput(os.Stdout)
 
 	// load the configuration file
-	conf, err := LoadConf(ConfigPath)
+	Config, err = LoadConf(ConfigPath)
 	if err != nil {
 		logrus.Errorln("failed to read config file:", err.Error())
 		os.Exit(-1)
@@ -69,7 +73,7 @@ func main() {
 		for sig := range signals {
 			logrus.Infoln("uprun received signal", sig, ": initiating shutdown")
 			if sig == syscall.SIGTERM || sig == syscall.SIGINT {
-				for _, service := range conf.Services {
+				for _, service := range Config.Services {
 					service.IgnoreFailure = true
 
 					// TODO : sigterm -> timeout -> sigkill
@@ -81,7 +85,7 @@ func main() {
 
 			} else {
 				// forward the signal to all services
-				for _, service := range conf.Services {
+				for _, service := range Config.Services {
 					err := service.Signal(sig)
 					if err != nil {
 						logrus.Errorln("failed to signal service", service.Name, err.Error())
@@ -95,7 +99,7 @@ func main() {
 		for svc := range failure {
 			logrus.Warnln("service", svc.Name, "failed: shutting down everything")
 
-			for _, service := range conf.Services {
+			for _, service := range Config.Services {
 				err := service.Signal(syscall.SIGTERM)
 				if err != nil {
 					logrus.Errorln("failed to signal service", service.Name, err.Error())
@@ -105,21 +109,18 @@ func main() {
 		}
 	}()
 
-	exportedSecrets, err := secrets.Export(conf.SecretDir)
+	// gather all the secrets from filesystem
+	exportedSecrets, err := secrets.Export(Config.SecretDir)
 	if err != nil {
 		logrus.Errorln("failed to export secrets:", err.Error())
 	}
 
 	// all configured services should be started one at a time
 	wg := sync.WaitGroup{}
-	for _, service := range conf.Services {
+	for _, service := range Config.Services {
 		logrus.Infoln("starting service", service.Name)
 
-		// filter all secrets which were configured for this service
-		secretPrefix := service.SecretPrefix
-		if secretPrefix == "" {
-			secretPrefix = conf.SecretPrefix
-		}
+		// filter all secerts for this service
 		secretsEnv := exportedSecrets.WithPrefix(service.SecretPrefix)
 		logrus.Debugln("exported secrets:", secretsEnv)
 

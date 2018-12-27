@@ -66,5 +66,13 @@ func LoadConf(path string) (*Conf, error) {
 		conf.SecretDir = DefaultSecretPath
 	}
 
+	// if no secret prefix is configured per service
+	// we should use the global one
+	for _, service := range conf.Services {
+		if service.SecretPrefix == "" {
+			service.SecretPrefix = Config.SecretPrefix
+		}
+	}
+
 	return &conf, nil
 }

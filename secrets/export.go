@@ -21,11 +21,12 @@ package secrets
 // ---------------------------------------------------------------------------------------
 
 import (
-	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 // ---------------------------------------------------------------------------------------
