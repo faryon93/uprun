@@ -66,7 +66,6 @@ func main() {
 		os.Exit(-1)
 	}
 
-	failure := make(chan *Service)
 	signals := make(chan os.Signal)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
@@ -76,10 +75,11 @@ func main() {
 				for _, service := range Config.Services {
 					service.IgnoreFailure = true
 
-					// TODO : sigterm -> timeout -> sigkill
-					err := service.Signal(syscall.SIGTERM)
+					err := service.Shutdown()
 					if err != nil {
-						logrus.Errorln("failed to signal service", service.Name, err.Error())
+						logrus.Errorf("failed to shutdown service \"%s\": %s",
+							service.Name, err.Error())
+						continue
 					}
 				}
 
@@ -95,19 +95,9 @@ func main() {
 		}
 	}()
 
-	go func() {
-		for svc := range failure {
-			logrus.Warnln("service", svc.Name, "failed: shutting down everything")
-
-			for _, service := range Config.Services {
-				err := service.Signal(syscall.SIGTERM)
-				if err != nil {
-					logrus.Errorln("failed to signal service", service.Name, err.Error())
-				}
-			}
-
-		}
-	}()
+	// start monitoring task failures
+	failure := make(chan *Service)
+	go failureMonitor(failure)
 
 	// gather all the secrets from filesystem
 	exportedSecrets, err := secrets.Export(Config.SecretDir)
@@ -135,4 +125,26 @@ func main() {
 	// wait until all services have been terminated
 	wg.Wait()
 	logrus.Println("all services have ended: exiting uprun")
+}
+
+// ---------------------------------------------------------------------------------------
+//  background tasks
+// ---------------------------------------------------------------------------------------
+
+// failureMonitor watches the failure channel for failed tasks and gracefully shuts
+// down the whole task with all its services.
+func failureMonitor(failure chan *Service) {
+	for svc := range failure {
+		logrus.Warnln("service", svc.Name, "failed: shutting down everything")
+
+		// shutdown all services which are registrated
+		for _, service := range Config.Services {
+			err := service.Shutdown()
+			if err != nil {
+				logrus.Errorf("failed to shutdown service \"%s\": %s",
+					service.Name, err.Error())
+				continue
+			}
+		}
+	}
 }

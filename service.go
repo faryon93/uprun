@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"syscall"
 )
 
 // ---------------------------------------------------------------------------------------
@@ -92,4 +93,26 @@ func (s *Service) Signal(sig os.Signal) error {
 	}
 
 	return s.cmd.Process.Signal(sig)
+}
+
+func (s *Service) Shutdown() error {
+	// TODO : sigterm -> timeout -> sigkill
+
+	// you cannot shutdown a services which is not running anymore
+	if s.cmd.ProcessState != nil && s.cmd.ProcessState.Exited() {
+		return nil
+	}
+
+	// stopping of the services is intented -> do not report
+	// failures/exits and do not handle them.
+	s.IgnoreFailure = true
+
+	// send SIGTERM in order to ask the application
+	// to shutdown gracefully
+	err := s.Signal(syscall.SIGTERM)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
