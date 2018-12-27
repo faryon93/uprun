@@ -66,38 +66,11 @@ func main() {
 		os.Exit(-1)
 	}
 
-	signals := make(chan os.Signal)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		for sig := range signals {
-			logrus.Infoln("uprun received signal", sig, ": initiating shutdown")
-			if sig == syscall.SIGTERM || sig == syscall.SIGINT {
-				for _, service := range Config.Services {
-					service.IgnoreFailure = true
-
-					err := service.Shutdown()
-					if err != nil {
-						logrus.Errorf("failed to shutdown service \"%s\": %s",
-							service.Name, err.Error())
-						continue
-					}
-				}
-
-			} else {
-				// forward the signal to all services
-				for _, service := range Config.Services {
-					err := service.Signal(sig)
-					if err != nil {
-						logrus.Errorln("failed to signal service", service.Name, err.Error())
-					}
-				}
-			}
-		}
-	}()
-
-	// start monitoring task failures
+	// start monitoring task failures and incoming os signals
 	failure := make(chan *Service)
-	go failureMonitor(failure)
+	termSignals := make(chan os.Signal)
+	signal.Notify(termSignals, syscall.SIGINT, syscall.SIGTERM)
+	go shutdownMonitor(failure, termSignals)
 
 	// gather all the secrets from filesystem
 	exportedSecrets, err := secrets.Export(Config.SecretDir)
@@ -124,6 +97,7 @@ func main() {
 
 	// wait until all services have been terminated
 	wg.Wait()
+
 	logrus.Println("all services have ended: exiting uprun")
 }
 
@@ -131,13 +105,20 @@ func main() {
 //  background tasks
 // ---------------------------------------------------------------------------------------
 
-// failureMonitor watches the failure channel for failed tasks and gracefully shuts
-// down the whole task with all its services.
-func failureMonitor(failure chan *Service) {
-	for svc := range failure {
-		logrus.Warnln("service", svc.Name, "failed: shutting down everything")
+// shutdownMonitor watches the failure channel for failed tasks and gracefully shuts
+// down the whole task with all its services. A gracefull shutdown is also performend
+// when SIGTERM / SIGINT is received.
+func shutdownMonitor(failure chan *Service, sigs chan os.Signal) {
+	for {
+		select {
+		case svc := <-failure:
+			logrus.Warnln("service", svc.Name, "failed: shutting down all services")
 
-		// shutdown all services which are registrated
+		case sig := <-sigs:
+			logrus.Infof("received signal %s: shutting down all services", sig)
+		}
+
+		// shutdown all services which are configured
 		for _, service := range Config.Services {
 			err := service.Shutdown()
 			if err != nil {
