@@ -70,7 +70,7 @@ func LoadConf(path string) (*Conf, error) {
 	// we should use the global one
 	for _, service := range conf.Services {
 		if service.SecretPrefix == "" {
-			service.SecretPrefix = Config.SecretPrefix
+			service.SecretPrefix = conf.SecretPrefix
 		}
 	}
 
