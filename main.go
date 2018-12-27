@@ -39,6 +39,7 @@ import (
 var (
 	ForceColors bool
 	ConfigPath  string
+	Version     bool
 
 	Config *Conf
 )
@@ -52,12 +53,17 @@ func main() {
 
 	flag.BoolVar(&ForceColors, "colors", false, "force logging with colors")
 	flag.StringVar(&ConfigPath, "conf", "uprun.hcl", "path to config file")
+	flag.BoolVar(&Version, "version", false, "display version")
 	flag.Parse()
 
 	// setup logger
 	formater := logrus.TextFormatter{ForceColors: ForceColors}
 	logrus.SetFormatter(&formater)
 	logrus.SetOutput(os.Stdout)
+
+	if Version {
+		logrus.Infoln(GetAppVersion())
+	}
 
 	// load the configuration file
 	Config, err = LoadConf(ConfigPath)

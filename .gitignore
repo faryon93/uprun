@@ -1,5 +1,6 @@
 .idea/
 
 *.bak
+uprun
 uprun_linux
 uprun.example.hcl
