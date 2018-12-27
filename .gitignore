@@ -2,3 +2,4 @@
 
 *.bak
 uprun_linux
+uprun.example.hcl
