@@ -51,7 +51,7 @@ func main() {
 	var err error
 
 	flag.BoolVar(&ForceColors, "colors", false, "force logging with colors")
-	flag.StringVar(&ConfigPath, "conf", "uprun.chl", "path to config file")
+	flag.StringVar(&ConfigPath, "conf", "uprun.hcl", "path to config file")
 	flag.Parse()
 
 	// setup logger

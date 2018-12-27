@@ -31,4 +31,4 @@ This little helper manages the lifecycle of your tasks.  It is intended to be us
       -colors
             force logging with colors
       -conf string
-            path to config file (default "uprun.chl")
+            path to config file (default "uprun.hcl")
