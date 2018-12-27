@@ -57,7 +57,7 @@ func main() {
 	flag.Parse()
 
 	// setup logger
-	formater := logrus.TextFormatter{ForceColors: ForceColors}
+	formater := logrus.TextFormatter{ForceColors: ForceColors, DisableColors: !ForceColors}
 	logrus.SetFormatter(&formater)
 	logrus.SetOutput(os.Stdout)
 
