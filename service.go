@@ -21,12 +21,13 @@ package main
 // ---------------------------------------------------------------------------------------
 
 import (
-	"github.com/kballard/go-shellquote"
-	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
 	"sync"
 	"syscall"
+
+	"github.com/kballard/go-shellquote"
+	"github.com/sirupsen/logrus"
 )
 
 // ---------------------------------------------------------------------------------------
@@ -34,8 +35,7 @@ import (
 // ---------------------------------------------------------------------------------------
 
 type Service struct {
-	Name string `hcl:",key"`
-
+	Name          string `hcl:",key"`
 	Command       string `hcl:"command"`
 	CaptureStdOut bool   `hcl:"capture_stdout"`
 	CaptureStdErr bool   `hcl:"capture_stderr"`
@@ -43,6 +43,7 @@ type Service struct {
 	StopTimeout   string `hcl:"stop_timeout"`
 	SecretPrefix  string `hcl:"secret_prefix"`
 
+	// private members
 	cmd *exec.Cmd
 }
 
@@ -50,6 +51,10 @@ type Service struct {
 //  public members
 // ---------------------------------------------------------------------------------------
 
+// Spawn starts this service.
+// wg is incremented when starting the task and decremented when the task is done
+// failure gets a message if the tasks exists and IgnoreFailure is not set
+// env are env variables which should be appended to this tasks env
 func (s *Service) Spawn(wg *sync.WaitGroup, failure chan *Service, env []string) error {
 	cmd, err := shellquote.Split(s.Command)
 	if err != nil {
@@ -72,21 +77,24 @@ func (s *Service) Spawn(wg *sync.WaitGroup, failure chan *Service, env []string)
 		return err
 	}
 
+	// start a watcher for task exit
 	wg.Add(1)
 	go func() {
-		s.cmd.Wait()
-		logrus.Printf("service %s exited", s.Name)
+		_ = s.cmd.Wait()
 
+		// do the necessary signaling
 		wg.Done()
-
 		if !s.IgnoreFailure {
 			failure <- s
 		}
+
+		logrus.Printf("service \"%s\" exited", s.Name)
 	}()
 
 	return nil
 }
 
+// Signal sends an os signal to this service.
 func (s *Service) Signal(sig os.Signal) error {
 	if s.cmd.ProcessState != nil && s.cmd.ProcessState.Exited() {
 		return nil
@@ -95,6 +103,8 @@ func (s *Service) Signal(sig os.Signal) error {
 	return s.cmd.Process.Signal(sig)
 }
 
+// Shutdown gracefully shutsdown this service. Exit is not reported
+// to the failure channel.
 func (s *Service) Shutdown() error {
 	// TODO : sigterm -> timeout -> sigkill
 
