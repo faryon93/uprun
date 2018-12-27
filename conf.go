@@ -20,7 +20,18 @@ package main
 //  imports
 // ---------------------------------------------------------------------------------------
 
-import ()
+import (
+	"github.com/hashicorp/hcl"
+	"io/ioutil"
+)
+
+// ---------------------------------------------------------------------------------------
+//  constants
+// ---------------------------------------------------------------------------------------
+
+const (
+	DefaultSecretPath = "/run/secrets"
+)
 
 // ---------------------------------------------------------------------------------------
 //  types
@@ -31,4 +42,29 @@ type Conf struct {
 	SecretPrefix string `hcl:"secret_prefix"`
 
 	Services []*Service `hcl:"service"`
+}
+
+// ---------------------------------------------------------------------------------------
+//  public functions
+// ---------------------------------------------------------------------------------------
+
+// LoadConf loads a configuration file which is stored in
+// the given filesystem path.
+func LoadConf(path string) (*Conf, error) {
+	buf, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	conf := Conf{}
+	err = hcl.Decode(&conf, string(buf))
+	if err != nil {
+		return nil, err
+	}
+
+	if conf.SecretDir == "" {
+		conf.SecretDir = DefaultSecretPath
+	}
+
+	return &conf, nil
 }

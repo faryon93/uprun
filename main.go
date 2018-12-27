@@ -21,14 +21,24 @@ package main
 // ---------------------------------------------------------------------------------------
 
 import (
-	"github.com/faryon93/uprun/secrets"
-	"github.com/hashicorp/hcl"
-	"github.com/sirupsen/logrus"
-	"io/ioutil"
+	"flag"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/faryon93/uprun/secrets"
+)
+
+// ---------------------------------------------------------------------------------------
+//  variables
+// ---------------------------------------------------------------------------------------
+
+var (
+	ForceColors bool
+	ConfigPath  string
 )
 
 // ---------------------------------------------------------------------------------------
@@ -36,22 +46,20 @@ import (
 // ---------------------------------------------------------------------------------------
 
 func main() {
-	formater := logrus.TextFormatter{ForceColors: true}
+	flag.BoolVar(&ForceColors, "colors", false, "force logging with colors")
+	flag.StringVar(&ConfigPath, "conf", "uprun.chl", "path to config file")
+	flag.Parse()
+
+	// setup logger
+	formater := logrus.TextFormatter{ForceColors: ForceColors}
 	logrus.SetFormatter(&formater)
 	logrus.SetOutput(os.Stdout)
 
-	buf, err := ioutil.ReadFile("uprun.example.hcl")
+	// load the configuration file
+	conf, err := LoadConf(ConfigPath)
 	if err != nil {
-		panic(err)
-	}
-
-	conf := Conf{}
-	err = hcl.Decode(&conf, string(buf))
-	if err != nil {
-		panic(err)
-	}
-	if conf.SecretDir == "" {
-		conf.SecretDir = "/run/secrets"
+		logrus.Errorln("failed to read config file:", err.Error())
+		os.Exit(-1)
 	}
 
 	failure := make(chan *Service)
@@ -97,28 +105,33 @@ func main() {
 		}
 	}()
 
-	secret, err := secrets.Export(conf.SecretDir)
+	exportedSecrets, err := secrets.Export(conf.SecretDir)
 	if err != nil {
 		logrus.Errorln("failed to export secrets:", err.Error())
 	}
 
+	// all configured services should be started one at a time
 	wg := sync.WaitGroup{}
 	for _, service := range conf.Services {
 		logrus.Infoln("starting service", service.Name)
 
+		// filter all secrets which were configured for this service
 		secretPrefix := service.SecretPrefix
 		if secretPrefix == "" {
 			secretPrefix = conf.SecretPrefix
 		}
+		secretsEnv := exportedSecrets.WithPrefix(service.SecretPrefix)
+		logrus.Debugln("exported secrets:", secretsEnv)
 
-		err := service.Spawn(&wg, failure, secret.WithPrefix(service.SecretPrefix))
+		// spawn the service
+		err := service.Spawn(&wg, failure, secretsEnv)
 		if err != nil {
 			logrus.Errorln("failed to spawn server", service.Name, err.Error())
 			continue
 		}
 	}
 
+	// wait until all services have been terminated
 	wg.Wait()
-
 	logrus.Println("all services have ended: exiting uprun")
 }
