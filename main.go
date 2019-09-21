@@ -81,7 +81,11 @@ func main() {
 	// gather all the secrets from filesystem
 	exportedSecrets, err := secrets.Export(Config.SecretDir)
 	if err != nil {
-		logrus.Errorln("failed to export secrets:", err.Error())
+		if os.IsNotExist(err) {
+			logrus.Warnln("not exporting secrets:", err.Error())
+		} else {
+			logrus.Errorln("failed to export secrets:", err.Error())
+		}
 	}
 
 	// all configured services should be started one at a time
