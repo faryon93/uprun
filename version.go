@@ -23,7 +23,7 @@ package main
 var (
 	// release information
 	AppName    = "uprun"
-	AppVersion = "0.1.0"
+	AppVersion = "0.1.2"
 
 	// filled by build tool
 	GitCommit   string
